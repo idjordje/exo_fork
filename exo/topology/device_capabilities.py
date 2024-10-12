@@ -1,5 +1,5 @@
 from exo import DEBUG
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 import subprocess
 import psutil
 
@@ -19,26 +19,58 @@ class DeviceFlops:
   def to_dict(self):
     return asdict(self)
 
+@dataclass
+class DeviceWeightedCapabilities:
+  iCPU_Cores: int = 0
+  iCPU_Memory: int = 0
+  iGPU_Cores: int = 0
+  dGPU_Cores: int = 0
+  dGPU_Memory: int = 0
+  
+  weight_iCPU_Cores: int = 1
+  weight_iCPU_Memory: int = 1
+  weight_iGPU_Cores: int = 1
+  weight_dGPU_Cores: int = 1
+  weight_dGPU_Memory: int = 1
 
+  weightedScore: int = field(init=False)
+
+  def getWeightedScore(self) -> int:
+    return self.weightedScore
+
+  def __str__(self):
+    return f"CPU_Cores: {self.iCPU_Cores}, CPU_Memory: {self.iCPU_Memory}, GPU_Cores: {self.iGPU_Cores}, dGPU_Cores: {self.dGPU_Cores}, dGPU_Memory: {self.dGPU_Memory}"
+      
+  def __post_init__(self):
+    self.weightedScore = self.weight_iCPU_Cores*self.iCPU_Cores + self.weight_iCPU_Memory*self.iCPU_Memory + self.weight_iGPU_Cores*self.iGPU_Cores + self.weight_dGPU_Cores*self.dGPU_Cores + self.weight_dGPU_Memory*self.dGPU_Memory
+
+  def to_dict(self) -> dict:
+    return asdict(self)
+  
 @dataclass
 class DeviceCapabilities:
   model: str
   chip: str
   memory: int
   flops: DeviceFlops
+  wCapabilities: DeviceWeightedCapabilities
 
   def __str__(self):
-    return f"Model: {self.model}. Chip: {self.chip}. Memory: {self.memory}MB. Flops: {self.flops}"
+    return f"Model: {self.model}. Chip: {self.chip}. Memory: {self.memory}MB. Flops: {self.flops}. WeightedCapabilities: {self.wCapabilities}"
 
   def __post_init__(self):
     if isinstance(self.flops, dict):
       self.flops = DeviceFlops(**self.flops)
+    if isinstance(self.wCapabilities, dict):
+      self.wCapabilities = DeviceWeightedCapabilities(**self.wCapabilities)
 
   def to_dict(self):
-    return {"model": self.model, "chip": self.chip, "memory": self.memory, "flops": self.flops.to_dict()}
+    return {"model": self.model, "chip": self.chip, "memory": self.memory, "flops": self.flops.to_dict(), "weighted_capabilities": self.wCapabilities.to_dict()}
 
 
-UNKNOWN_DEVICE_CAPABILITIES = DeviceCapabilities(model="Unknown Model", chip="Unknown Chip", memory=0, flops=DeviceFlops(fp32=0, fp16=0, int8=0))
+UNKNOWN_DEVICE_CAPABILITIES = DeviceCapabilities(model="Unknown Model", chip="Unknown Chip", memory=0, 
+                                                 flops=DeviceFlops(fp32=0, fp16=0, int8=0), 
+                                                 wCapabilities=DeviceWeightedCapabilities(iCPU_Cores=0,iCPU_Memory=0,iGPU_Cores=0,dGPU_Cores=0,dGPU_Memory=0))
 
 CHIP_FLOPS = {
   # Source: https://www.cpu-monkey.com
@@ -145,7 +177,28 @@ def device_capabilities() -> DeviceCapabilities:
       flops=DeviceFlops(fp32=0, fp16=0, int8=0),
     )
 
-
+def mac_weighted_device_capabilities() -> DeviceWeightedCapabilities:
+  hardware_model = subprocess.check_output(["system_profiler", "SPHardwareDataType"]).decode("utf-8")
+  num_cores_line = next((line for line in hardware_model.split("\n") if "Total Number of Cores" in line), None)
+  num_cores_id = num_cores_line.split(": ")[1] if num_cores_line else "0"
+  iCPU_Cores = num_cores_id.split(" ")[0]
+  
+  memory_model = subprocess.check_output(["system_profiler", "SPHardwareDataType"]).decode("utf-8")
+  memory_line = next((line for line in memory_model.split("\n") if "Memory" in line), None)
+  memory_str = memory_line.split(": ")[1] if memory_line else "Unknown Memory"
+  memory_units = memory_str.split()
+  memory_value = int(memory_units[0])
+  if memory_units[1] == "GB":
+    iCPU_Memory = memory_value*1024
+  else:
+    iCPU_Memory = memory_value
+  
+  graphics_model = subprocess.check_output(["system_profiler", "SPDisplaysDataType"]).decode("utf-8")
+  num_cores_line = next((line for line in graphics_model.split("\n") if "Total Number of Cores" in line), None)
+  iGPU_Cores = num_cores_line.split(": ")[1] if num_cores_line else "0"
+  
+  return DeviceWeightedCapabilities(iCPU_Cores=iCPU_Cores,iCPU_Memory=iCPU_Memory,iGPU_Cores=iGPU_Cores,dGPU_Cores=0,dGPU_Memory=0)
+  
 def mac_device_capabilities() -> DeviceCapabilities:
   # Fetch the model of the Mac using system_profiler
   model = subprocess.check_output(["system_profiler", "SPHardwareDataType"]).decode("utf-8")

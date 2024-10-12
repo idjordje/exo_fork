@@ -1,5 +1,6 @@
 import unittest
 from exo.topology.ring_memory_weighted_partitioning_strategy import RingMemoryWeightedPartitioningStrategy
+from exo.topology.ring_capability_weighted_partitioning_strategy import RingCapabilityWeightedPartitioningStrategy
 from exo.topology.topology import Topology
 from exo.topology.device_capabilities import DeviceCapabilities, DeviceFlops, DeviceWeightedCapabilities
 from exo.topology.partitioning_strategy import Partition
@@ -14,26 +15,26 @@ class TestRingMemoryWeightedPartitioningStrategy(unittest.TestCase):
       "node1",
       DeviceCapabilities(model="test1", chip="test1", memory=3000,
                          flops=DeviceFlops(fp32=0, fp16=0, int8=0),
-                         wCapabilities=DeviceWeightedCapabilities(iCPU_Cores=0,iCPU_Memory=0,iGPU_Cores=0,dGPU_Cores=0,dGPU_Memory=0)),
+                         wCapabilities=DeviceWeightedCapabilities(iCPU_Cores=0,iCPU_Memory=0,iGPU_Cores=0,dGPU_Cores=0,dGPU_Memory=0))
     )
     topology.update_node(
       "node2",
       DeviceCapabilities(model="test2", chip="test2", memory=1000,
                          flops=DeviceFlops(fp32=0, fp16=0, int8=0),
-                         wCapabilities=DeviceWeightedCapabilities(iCPU_Cores=0,iCPU_Memory=0,iGPU_Cores=0,dGPU_Cores=0,dGPU_Memory=0)),
+                         wCapabilities=DeviceWeightedCapabilities(iCPU_Cores=0,iCPU_Memory=0,iGPU_Cores=0,dGPU_Cores=0,dGPU_Memory=0))
     )
     topology.update_node(
       "node3",
       DeviceCapabilities(model="test3", chip="test3", memory=6000,
                          flops=DeviceFlops(fp32=0, fp16=0, int8=0),
-                         wCapabilities=DeviceWeightedCapabilities(iCPU_Cores=0,iCPU_Memory=0,iGPU_Cores=0,dGPU_Cores=0,dGPU_Memory=0)),
+                         wCapabilities=DeviceWeightedCapabilities(iCPU_Cores=0,iCPU_Memory=0,iGPU_Cores=0,dGPU_Cores=0,dGPU_Memory=0))
     )
     topology.add_edge("node1", "node2")
     topology.add_edge("node2", "node3")
     topology.add_edge("node3", "node1")
     topology.add_edge("node1", "node3")
 
-    strategy = RingMemoryWeightedPartitioningStrategy()
+    strategy = RingCapabilityWeightedPartitioningStrategy()
     partitions = strategy.partition(topology)
 
     self.assertEqual(len(partitions), 3)
@@ -93,7 +94,6 @@ class TestRingMemoryWeightedPartitioningStrategy(unittest.TestCase):
         Partition("node2", 0.9, 1.0),
       ],
     )
-
 
 if __name__ == "__main__":
   unittest.main()

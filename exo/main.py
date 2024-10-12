@@ -47,6 +47,7 @@ parser.add_argument("--run-model", type=str, help="Specify a model to run direct
 parser.add_argument("--prompt", type=str, help="Prompt for the model when using --run-model", default="Who are you?")
 parser.add_argument("--tailscale-api-key", type=str, default=None, help="Tailscale API key")
 parser.add_argument("--tailnet-name", type=str, default=None, help="Tailnet name")
+parser.add_argument("--weighted-device-capabilities", type=bool, default=False, help="Enable detection of weighted device capabilities. Default = False")
 args = parser.parse_args()
 
 print_yellow_exo()
@@ -79,12 +80,17 @@ if args.discovery_module == "udp":
 elif args.discovery_module == "tailscale":
   discovery = TailscaleDiscovery(args.node_id, args.node_port, lambda peer_id, address, device_capabilities: GRPCPeerHandle(peer_id, address, device_capabilities), discovery_timeout=args.discovery_timeout, tailscale_api_key=args.tailscale_api_key, tailnet=args.tailnet_name)
 topology_viz = TopologyViz(chatgpt_api_endpoints=chatgpt_api_endpoints, web_chat_urls=web_chat_urls) if not args.disable_tui else None
+
+if args.weighted_device_capabilities == True:
+  partitioning_strategy=RingCapabilityWeightedPartitioningStrategy()
+else:
+  partitioning_strategy=RingMemoryWeightedPartitioningStrategy()
 node = StandardNode(
   args.node_id,
   None,
   inference_engine,
   discovery,
-  partitioning_strategy=RingMemoryWeightedPartitioningStrategy(),
+  partitioning_strategy=partitioning_strategy,
   max_generate_tokens=args.max_generate_tokens,
   topology_viz=topology_viz
 )
